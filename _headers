@@ -1,0 +1,18 @@
+# En-têtes HTTP, lus par Cloudflare (site définitif) ; ignorés par GitHub Pages (aperçu).
+# Fichiers de _astro : leur nom change à chaque modification, ils peuvent rester en cache un an.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Catalogue lu par la Sélection et les filtres : toujours revalidé.
+/data/catalogue.json
+  Cache-Control: no-cache
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+
+# Adresses techniques *.workers.dev (adresse du Worker et versions) : jamais indexées, le site définitif est sur
+# son domaine.
+https://:version.:subdomain.workers.dev/*
+  X-Robots-Tag: noindex
