@@ -1,0 +1,26 @@
+# En-têtes HTTP, lus par Cloudflare (site définitif) ; ignorés par GitHub Pages (aperçu).
+# Fichiers de _astro : leur nom change à chaque modification, ils peuvent rester en cache un an.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Catalogue lu par la Sélection et les filtres : toujours revalidé.
+/data/catalogue.json
+  Cache-Control: no-cache
+
+# Sécurité, sur toutes les pages : HTTPS seul pendant un an (sans les sous-domaines, que le client peut utiliser
+# ailleurs), jamais affiché dans le cadre d'un autre site (protège l'outil de gestion, qui garde le jeton GitHub),
+# ni plugin ni changement d'adresse de base. Les scripts de l'outil de gestion sont limités par sa propre politique
+# (balise meta de src/pages/admin/index.astro) ; ceux du site public n'utilisent que ce site, plus la mesure
+# d'audience facultative.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+  Strict-Transport-Security: max-age=31536000
+  X-Frame-Options: DENY
+  Content-Security-Policy: frame-ancestors 'none'; object-src 'none'; base-uri 'self'
+
+# Adresses techniques *.workers.dev (adresse du Worker et versions) : jamais indexées, le site définitif est sur
+# son domaine.
+https://:version.:subdomain.workers.dev/*
+  X-Robots-Tag: noindex

@@ -1,0 +1,313 @@
+# Outil de gestion du catalogue (Sveltia CMS). Adresse : /admin/
+# Chaque enregistrement devient un commit dans le dépôt GitHub ; le site se reconstruit ensuite.
+# Les libellés et les aides ci-dessous sont ceux que voit le client.
+
+backend:
+  name: github
+  # Dépôt GitHub du site, sous la forme proprietaire/depot. À remplacer par celui du client à la remise.
+  repo: zerotrace4/hors-vitrine
+  branch: main
+  # Connexion par jeton d'accès uniquement, tant que la connexion « Se connecter avec GitHub » n'est pas installée
+  # (voir « Mettre l'outil en service » dans le README). Retirer cette ligne ensuite.
+  auth_methods: [token]
+  commit_messages:
+    create: 'Ajout : {{slug}}'
+    update: 'Modification : {{slug}}'
+    delete: 'Retrait : {{slug}}'
+    uploadMedia: 'Photo ajoutée : {{path}}'
+    deleteMedia: 'Photo retirée : {{path}}'
+
+# Les photos sont rangées avec le code du site ; le build en fait des versions AVIF et WebP.
+media_folder: /src/assets/photos
+public_folder: /src/assets/photos
+media_libraries:
+  all:
+    transformations:
+      # Une photo de téléphone est réduite et convertie avant l'envoi.
+      raster_image:
+        format: webp
+        quality: 85
+        width: 2000
+        height: 2500
+  # Pas de banques d'images (Pexels, Unsplash…) : seulement les photos du client (règle du site).
+  stock_assets:
+    providers: []
+
+slug:
+  encoding: ascii
+  clean_accents: true
+
+collections:
+  - name: pieces
+    label: Pièces
+    label_singular: Pièce
+    icon: checkroom
+    description: Vos pièces. Une pièce enregistrée apparaît sur le site quelques minutes plus tard (un peu plus quand vous ajoutez beaucoup de photos d’un coup).
+    folder: /src/content/pieces
+    format: json
+    extension: json
+    create: true
+    delete: true
+    duplicate: true
+    identifier_field: modele
+    # Nom du fichier fixé à la création, jamais modifiable : il porte l'adresse de la fiche (liens déjà envoyés sur
+    # WhatsApp), l'historique des prix (prix barré) et la référence automatique.
+    slug:
+      template: '{{marque}}-{{modele}}-{{coloris}}'
+      editable: false
+    summary: '{{marque}} {{modele}}, {{coloris}}'
+    thumbnail: photos
+    table_columns:
+      - _summary
+      - prix
+      - reduction
+      - statut
+      - univers
+      - date_arrivage
+    sortable_fields:
+      fields: [date_arrivage, marque, prix]
+      default:
+        field: date_arrivage
+        direction: descending
+    view_filters:
+      - { label: Disponibles, field: statut, pattern: disponible }
+      - { label: Réservées, field: statut, pattern: reserve }
+      - { label: Vendues, field: statut, pattern: vendu }
+      - { label: En promotion, field: reduction, pattern: '^[1-9]' }
+    view_groups:
+      - { label: Univers, field: univers }
+      - { label: Marque, field: marque }
+    # Modifier plusieurs pièces d'un coup : statut, prix, promotion.
+    bulk_edit:
+      fields: [statut, prix, reduction, promo_fin, univers]
+    fields:
+      - { name: marque, label: Marque, widget: string }
+      - { name: modele, label: Modèle, widget: string }
+      - { name: coloris, label: Coloris, widget: string, hint: 'Exemple : Black/Ivory. Tant que la pièce n’a pas de photo, la couleur du visuel vient du premier mot reconnu (black, white, grey, navy, brown, red…).' }
+      - name: univers
+        label: Univers
+        widget: select
+        default: sneakers
+        options:
+          - { label: Sneakers, value: sneakers }
+          - { label: Streetwear, value: streetwear }
+          - { label: Luxe, value: luxe }
+          - { label: Montres, value: montres }
+          - { label: Accessoires, value: accessoires }
+      - name: statut
+        label: Statut
+        widget: select
+        default: disponible
+        options:
+          - { label: Disponible, value: disponible }
+          - { label: Réservée, value: reserve }
+          - { label: Vendue, value: vendu }
+      - name: prix
+        label: Prix
+        widget: number
+        value_type: int
+        min: 1
+        after_input: '€'
+        hint: Prix normal, en euros, sans centimes. C’est un prix d’achat, jamais un prix de location.
+      - name: reduction
+        label: Promotion, réduction
+        widget: number
+        value_type: int
+        min: 1
+        max: 90
+        required: false
+        after_input: '%'
+        hint: 'Laissez vide s’il n’y a pas de promotion. Vous saisissez seulement la réduction. Le prix barré est calculé tout seul. C’est le prix le plus bas pratiqué pendant les 30 jours précédents. Une pièce mise en ligne directement en promotion s’affiche au prix réduit, sans prix barré : elle n’a pas encore de prix antérieur. Pour arrêter la promotion, videz ce champ.'
+      - name: promo_fin
+        label: Promotion, dernier jour
+        widget: datetime
+        type: date
+        format: YYYY-MM-DD
+        required: false
+        hint: Facultatif. Après cette date, la pièce revient à son prix normal.
+      - name: photos
+        label: Photos de la pièce
+        widget: image
+        multiple: true
+        max: 3
+        required: false
+        # Photos d'appareil et de téléphone (HEIC d'iPhone compris) : l'outil les convertit toutes en WebP avant l'envoi.
+        # SVG et GIF sont écartés.
+        accept: 'image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif,.heic,.heif'
+        # Pas d'adresse web : une photo hébergée ailleurs ne serait pas optimisée par le site.
+        choose_url: false
+        hint: Une à trois photos, en hauteur (format 4:5). Vos propres photos uniquement, jamais les visuels officiels des marques.
+      - name: systeme_taille
+        label: Type de taille
+        widget: select
+        default: EU
+        options:
+          - { label: 'Pointure ou taille européenne (40, 41, 42…)', value: EU }
+          - { label: 'Taille internationale (S, M, L…)', value: INT }
+          - { label: Taille unique, value: TU }
+      - name: tailles
+        label: Tailles
+        label_singular: taille
+        widget: list
+        required: false
+        summary: '{{taille}}'
+        hint: 'À laisser vide pour une taille unique (casquette, montre, sac). Pour des sneakers, indiquez au moins une pointure ; sinon la fiche affiche « Taille à confirmer ».'
+        fields:
+          - { name: taille, label: Taille, widget: string, hint: 'Exemples : 42, 42.5, 41 1/3, M. Une virgule est changée en point.' }
+          - name: dispo
+            label: Disponibilité
+            widget: select
+            default: en_stock
+            options:
+              - { label: En stock, value: en_stock }
+              - { label: Dernière, value: derniere }
+              - { label: Sur demande, value: sur_demande }
+              - { label: Épuisée, value: epuise }
+      - name: etat
+        label: État
+        widget: select
+        default: neuf
+        options:
+          - { label: Neuf, value: neuf }
+          - { label: Neuf avec étiquettes, value: neuf_avec_etiquettes }
+          - { label: Très bon état, value: tres_bon_etat }
+          - { label: Bon état, value: bon_etat }
+      - name: badges
+        label: Étiquette sur la tuile
+        widget: select
+        multiple: true
+        required: false
+        max: 1
+        options:
+          - { label: Nouveau, value: nouveau }
+          - { label: Rare, value: rare }
+          - { label: Dernière pièce, value: derniere_piece }
+          - { label: Sur commande, value: sur_commande }
+      - { name: saison, label: Saison ou année, widget: string, required: false, hint: 'Exemples : 2025, FW25, Permanent' }
+      - name: date_arrivage
+        label: Date d’arrivage
+        widget: datetime
+        type: date
+        format: YYYY-MM-DD
+        default: '{{now}}'
+        hint: Sert à classer les nouveautés.
+      - { name: phare, label: Pièce phare de l’accueil, widget: boolean, default: false, required: false, hint: 'Une seule pièce à la fois. Une pièce vendue n’est pas mise en avant : le dernier arrivage la remplace.' }
+      - name: note
+        label: Votre mot sur la pièce
+        widget: text
+        hint: Quelques phrases à la première personne. Pas de promesse d’authenticité ici pour une pièce basique.
+      - { name: delai, label: Délai d’expédition, widget: string, required: false, hint: 'Vide, le site affiche « Expédition sous 48 h après confirmation ».' }
+      - name: associees
+        label: À porter avec
+        widget: relation
+        collection: pieces
+        value_field: '{{slug}}'
+        # Le nom du fichier distingue deux exemplaires du même modèle (pièce dupliquée).
+        display_fields: ['{{marque}} {{modele}}, {{coloris}} ({{slug}})']
+        search_fields: [marque, modele, coloris, ref]
+        multiple: true
+        max: 3
+        required: false
+        hint: 'Facultatif. Vide, ou si une pièce choisie est vendue, le site complète avec des pièces récentes du même univers.'
+      - { name: ref, label: Référence, widget: string, required: false, hint: 'Facultatif. Vide, une référence est créée automatiquement. Après « Dupliquer », videz-la ou changez-la : deux pièces ne doivent pas avoir la même.' }
+      - name: authenticite
+        label: Pièce de prestige
+        widget: object
+        required: false
+        collapsed: false
+        hint: À cocher seulement pour une pièce de prestige. Le bloc Authenticité apparaît alors sur la fiche. Vous êtes responsable de chaque mention.
+        fields:
+          - { name: methode, label: Méthode de contrôle, widget: text }
+          - { name: fournis, label: Fourni avec la pièce, label_singular: élément, widget: list, required: false, hint: 'Exemples : Boîte d’origine, Facture, Dustbag' }
+          - { name: etat_detaille, label: État détaillé, widget: text, required: false, hint: 'Vide : pour une pièce neuve, le site affiche « Jamais portée, aucun défaut constaté » ; pour une pièce portée, seulement son état. Décrivez chaque trace.' }
+          - { name: caracteristiques, label: Caractéristiques, label_singular: caractéristique, widget: list, required: false }
+
+  - name: reglages
+    label: Réglages
+    icon: settings
+    description: Vos coordonnées et les textes du site.
+    files:
+      - name: boutique
+        label: Boutique et coordonnées
+        file: /src/content/reglages.json
+        fields:
+          - { name: boutique, label: Nom de la boutique, widget: string }
+          - { name: prenom, label: Votre prénom, widget: string }
+          - { name: ville, label: Ville, widget: string }
+          - { name: siret, label: SIRET, widget: string, pattern: ['^\s*(?:\d\s*){14}$', 'Le SIRET compte 14 chiffres.'] }
+          - name: whatsapp
+            label: Numéro WhatsApp
+            widget: string
+            pattern: ['^\s*(?:\+|00)(?:[\s().-]*\d){8,15}[\s().-]*$', 'Numéro invalide. Commencez par l’indicatif du pays (+33 pour la France), puis 8 à 15 chiffres. Exemple : +33 6 12 34 56 78']
+            hint: Avec l’indicatif du pays. Tous les boutons WhatsApp du site utilisent ce numéro.
+          - { name: email, label: E-mail de contact, widget: string, pattern: ['^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$', 'Adresse e-mail invalide.'] }
+          - { name: instagram, label: Lien Instagram, widget: string, pattern: ['^https://', 'Le lien doit commencer par https://'] }
+          - { name: delai_reponse, label: Délai de réponse, widget: string, hint: 'Exemple : Réponse sous 2 h, 9 h à 21 h, 7 j/7' }
+          - { name: zones, label: Zones de livraison, label_singular: zone, widget: list }
+          - { name: retours, label: Politique de retour, widget: text }
+          - { name: reglement, label: Texte de règlement, widget: text }
+          - { name: a_propos, label: 'À propos, paragraphe Parcours', widget: text, hint: 'Vous pouvez écrire {BOUTIQUE} et {VILLE} : ils sont remplacés par vos réglages.' }
+          - { name: site_url, label: Adresse du site, widget: string, pattern: ['^https://[^/\s]+$', 'Exemple : https://www.monsite.fr, sans espace ni barre à la fin.'], hint: Elle apparaît dans les messages WhatsApp. À changer seulement avec votre nom de domaine. }
+      - name: faq
+        label: Questions fréquentes
+        file: /src/content/faq.json
+        fields:
+          - name: questions
+            label: Questions
+            label_singular: question
+            widget: list
+            summary: '{{q}}'
+            hint: 'Dans une réponse, {DELAI_REPONSE}, {REGLEMENT} et {RETOURS} sont remplacés par vos réglages.'
+            fields:
+              - { name: q, label: Question, widget: string }
+              - { name: a, label: Réponse, widget: text }
+      - name: legal
+        label: Textes légaux
+        file: /src/content/legal.json
+        fields:
+          - name: mentions
+            label: Mentions légales
+            widget: object
+            collapsed: true
+            hint: 'À faire valider. Les passages marqués [À REMPLACER] sont à compléter. {BOUTIQUE}, {PRENOM}, {VILLE}, {SIRET}, {EMAIL}, {WHATSAPP}, {REGLEMENT}, {RETOURS} et {ZONES} sont remplacés par vos réglages.'
+            fields:
+              - { name: titre, label: Titre, widget: string }
+              - { name: intro, label: Introduction, widget: text }
+              - name: sections
+                label: Sections
+                label_singular: section
+                widget: list
+                summary: '{{titre}}'
+                fields:
+                  - { name: titre, label: Titre, widget: string }
+                  - { name: texte, label: Texte, widget: text }
+          - name: cgv
+            label: Conditions générales de vente
+            widget: object
+            collapsed: true
+            fields:
+              - { name: titre, label: Titre, widget: string }
+              - { name: intro, label: Introduction, widget: text }
+              - name: sections
+                label: Sections
+                label_singular: section
+                widget: list
+                summary: '{{titre}}'
+                fields:
+                  - { name: titre, label: Titre, widget: string }
+                  - { name: texte, label: Texte, widget: text }
+          - name: confidentialite
+            label: Données personnelles
+            widget: object
+            collapsed: true
+            fields:
+              - { name: titre, label: Titre, widget: string }
+              - { name: intro, label: Introduction, widget: text }
+              - name: sections
+                label: Sections
+                label_singular: section
+                widget: list
+                summary: '{{titre}}'
+                fields:
+                  - { name: titre, label: Titre, widget: string }
+                  - { name: texte, label: Texte, widget: text }
